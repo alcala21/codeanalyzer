@@ -2,6 +2,7 @@
 import sys
 import os
 import re
+import ast
 
 
 def s001(_res, _count, _line, _fpath):
@@ -70,11 +71,60 @@ def s009(_res, _count, _line, _fpath):
             _res += f"{_fpath}: Line {_count}: S009 Function name function_name should be written in snake_case.",
 
 
+def s010(_res, file_text, _fpath):
+    tree = ast.parse("".join(file_text))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef):
+            if any([not bool(re.match(r"(_{,2}[a-z]+_{,2})+", a.arg)) for a in node.args.args]):
+                ind = 0
+                for i in range(len(file_text)):
+                    if re.search(node.name, file_text[i]):
+                        ind = i + 1
+                        break
+                _res += f"{_fpath}: Line {ind}: S010 Argument name arg_name should be written in snake_case.",
+
+
+def s011(_res, file_text, _fpath):
+    tree = ast.parse("".join(file_text))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            if isinstance(node.targets[0], ast.Name):
+                names = [node.targets[0].id]
+            elif isinstance(node.targets[0], ast.Attribute):
+                names = [node.targets[0].value.id, node.targets[0].attr]
+            if any(not is_snake(x) for x in names):
+                ind = 0
+                for i in range(len(file_text)):
+                    if re.search(f"{names[-1]} *=", file_text[i]):
+                        ind = i + 1
+                        break
+                _res += f"{_fpath}: Line {ind}: S011 Variable var_name should be written in snake_case",
+
+
+def s012(_res, file_text, _fpath):
+    tree = ast.parse("".join(file_text))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef):
+            if any(isinstance(x, (ast.Dict, ast.Set, ast.List)) for x in node.args.defaults):
+                ind = 0
+                for i in range(len(file_text)):
+                    if re.search(node.name, file_text[i]):
+                        ind = i + 1
+                        break
+                _res += f"{_fpath}: Line {ind}: S012 The default argument value is mutable",
+
+
+def is_snake(text):
+    return bool(re.match(r"(_{,2}[a-z]+_{,2}[a-z]*)+\b", text))
+
+
 def analyzer(_res, _file):
     count = 0
+
     with open(_file, 'r') as f:
+        text = f.readlines()
         empty = 0
-        for line in f:
+        for line in text:
             count += 1
             if line == "\n":
                 empty += 1
@@ -91,6 +141,10 @@ def analyzer(_res, _file):
                 s009(_res, count, line, _file)
 
                 empty = 0
+
+        s010(_res, text, _file)
+        s011(_res, text, _file)
+        s012(_res, text, _file)
 
 
 arg = sys.argv[1]
